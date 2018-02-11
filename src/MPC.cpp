@@ -8,26 +8,14 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 10;
+size_t N = 9;
 double dt = 0.1;
 
-// This value assumes the model presented in the classroom is used.
-//
-// It was obtained by measuring the radius formed by running the vehicle in the
-// simulator around in a circle with a constant steering angle and velocity on a
-// flat terrain.
-//
-// Lf was tuned until the the radius formed by the simulating the model
-// presented in the classroom matched the previous radius.
-//
-// This is the length from front to CoG that has a similar radius.
-const double Lf = 2.67;
-
 // Both the reference cross track and orientation errors are 0.
-// The reference velocity is set to 40 mph.
-double ref_v = 70;
+// The reference velocity is set to 70 mph.
+double ref_v = 75;
 
-std::array<double, 7> gains = {10000, 5000, 5, 3000, 100, 1000, 50};
+std::array<double, 7> gains = {100, 900, 100, 2000, 100, 500, 1};
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -116,12 +104,6 @@ public:
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
 
-      // Add sensor delay of 1 step = 100 ms when calculating the actuations
-      if (t > 1) {
-        a0 = vars[a_start + t - 2];
-        delta0 = vars[delta_start + t - 2];
-      }
-
       // 3rd order poly fn
       AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0 +
                       coeffs[3] * x0 * x0 * x0;
@@ -131,10 +113,11 @@ public:
       // Zero contraints
       fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
       fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-      fg[1 + psi_start + t] = psi1 - (psi0 + v0 / Lf * delta0 * dt);
+      fg[1 + psi_start + t] = psi1 - (psi0 + v0 / MPC::Lf * delta0 * dt);
       fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
       fg[1 + cte_start + t] = cte1 - (f0 - y0 + v0 * CppAD::sin(epsi0) * dt);
-      fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 + v0 / Lf * delta0 * dt);
+      fg[1 + epsi_start + t] =
+          epsi1 - (psi0 - psides0 + v0 / MPC::Lf * delta0 * dt);
     }
   }
 };

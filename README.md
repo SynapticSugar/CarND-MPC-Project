@@ -20,7 +20,9 @@ The state includes the {x,y} position and velocity of the car with crosstrack an
 
 ### Time Stepping
 
-To generate the ideal trajectory, a set of N points covers a duration of T seconds with a timestep dt.  The duration of the desired trajectory, T, is desired to be around ```1 second```.  Using this as a starting point, I initally set the step size to ```20``` and incremented by a time delta of ```0.05 seconds``` for a total of 1 second.  The issue I had with this was that the solver could not process this faster than about ```33 ms```.  I wanted to keep the solver fast so I could maintain a framerate of ```25``` with some extra headroom.  I decided that ```10 steps``` was ideal for this but I had to increase the dt to ```0.1 seconds``` to meet the one second requirement.  Another reason for having a dt of ```.1 seconds``` was that it lined up perfectly with the ```100 ms``` delay from the measurement system.
+To generate the ideal trajectory, a set of N points covers a duration of T seconds with a timestep dt.  The duration of the desired trajectory, T, is desired to be around ```1 second```.  Using this as a starting point, I initally set the step size to ```20``` and incremented by a time delta of ```0.05 seconds``` for a total of 1 second.  The issue I had with this was that the solver could not process this faster than about ```33 ms```.  I wanted to keep the solver fast so I could maintain a framerate of ```25``` with some extra headroom.  I decided that ```10 steps``` was ideal for this but I had to increase the dt to ```0.1 seconds``` to meet the one second requirement.  Another reason for having a dt of ```.1 seconds``` was that it lined up perfectly with the ```100 ms``` delay from the measurement system. I lowered the final N to 9 steps to avoid having the trajectory reach too far around coners and cause a poor fit.
+
+In the end, the final paramters were ```N=9``` and ```dt=0.1```.
 
 ### Polynomial Fit
 
@@ -28,11 +30,13 @@ Waypoints from the Unity model are given for the desired track line to follow on
 
 The waypoints are provided in world coordinates, so they must be converted to vehicle coordinates before that can be used in MPC.  This is accomplished in main.cpp where the rotation and translation of the vehicle in world space are made available.  Once the coordinates are transformed, a ```3rd order``` polynomial fit is performed and the cross track error and vehicle heading error are calculated.
 
-Since the waypoints are moved into the vehicle coordinate system, the state for the x, y, and psi positions are all set to 0.  This simplifies the state velocity, cross track error, and psi error only.  These are then fed into the MPC ```Solve``` function.
+Since the waypoints are moved into the vehicle coordinate system, the state for the x, y, and psi positions are all set to 0.  This simplifies the calculation of the delayed state pose that is then fed into the MPC ```Solve``` function.
 
 ### Latency
 
-In the real world, sensors will have some degree of latency when they get into the model update.  This latency is the sum of delays in the communication path, filters, and even from the sensor itself.  It is important to understand the latency you have in the system so that you can control in the correct timeframe.  Here the latency is hard coded as 100 miliseconds. Since the measurement comes from the past, it is important to either propagate this measurement forward in time or move the control back in time by the delay value.  In my case I moved the control for this measurement back in time one step, where a step is equal to 100 ms. This was handled right in the MPC class ```FG_eval``` function.
+In the real world, sensors will have some degree of latency when they get into the model update.  This latency is the sum of delays in the communication path, filters, and even from the sensor itself.  It is important to understand the latency you have in the system so that you can control in the correct timeframe.  Here the latency is hard coded as 100 miliseconds. Since the measurement comes from the past, it is important to either propagate this measurement forward in time or move the control back in time by the delay value.
+
+In my case I propagated the current vehicle state into the future by the delay of 100 ms and added an additional 10 ms for the connection delay. This way, the MPC would fit to the future state of the vehicle when actuation commands actually get there.
 
 ## Simulation Results
 
@@ -40,11 +44,11 @@ In the real world, sensors will have some degree of latency when they get into t
 
 No tire may leave the drivable portion of the track surface. The car may not pop up onto ledges or roll over any surfaces that would otherwise be considered unsafe (if humans were in the vehicle).
 
-Here are the results of running the simulator at a desired setting of ```80 MPH``` completing a full lape of the Lake Course.
+Here are the results of running the simulator and completing a full lape of the Lake Course with a top speed of 85MPH.
 
-![alt text](./MPC_80_MPH.gif "80 MPH")
+![alt text](./MPC_85_MPH.gif "85 MPH")
 
-A longer 2 minute YouTube video is featured here: https://youtu.be/E5XWZySQaB0
+A longer 2 minute YouTube video is featured here: https://youtu.be/sh_ylrELp9I
 
 ## Dependencies
 
