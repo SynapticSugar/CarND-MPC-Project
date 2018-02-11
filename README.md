@@ -10,29 +10,29 @@ In this project we implement Model Predictive Control to drive the car around th
 
 ### The Model Predictive Control Loop
 
-I implemented the Model Predictive Controller from the Udacity class lectures.  Put simply this controls the vehicle by optimizing a cost function using a polynomial trajectory to generate actuator outputs.
+I implemented the Model Predictive Controller from the Udacity class lectures.  Put simply, this controls the vehicle by optimizing a cost function using a polynomial trajectory to generate actuator outputs.
 
 The main MPC loop and the equations used in this implementation are shown as follows:
 
 ![alt text](./MPC.png "MPC")
 
-The state includes the {x,y} position and velocity of the car with crosstrack and steering angle errors. The contraints are a steering angle between ```-25 and 25``` degrees with a bounded accelleration between ```+1 and -1```.  The cost minimizes the errors between the desired and current state, the use of the actuator controls, and the amount of change between sequential actions.  The model is based on the kinematic equations for the standard bicycle model with added weight and center of gravity. The control outputs are the steering and acceleration actuations.
+The state includes the {x,y} position and velocity of the car with crosstrack and steering angle errors. The constraints are a steering angle between ```-25 and 25``` degrees with a bounded acceleration between ```+1 and -1```.  The cost function minimizes the errors between the desired and current state, the use of the actuator controls, and the amount of change between sequential actions.  The model is based on the kinematic equations for the standard bicycle model with added weight and center of gravity. The control outputs are the steering and acceleration actuations.
 
 ### Time Stepping
 
-To generate the ideal trajectory a set of N points covers a duration of T seconds with a timestep dt.  The duration of the desired trajectory, T, is desired to be around ```1 second```.  Using this as a starting point I initally set the step size to ```20``` and incremented by a time deltat of ```0.05 seconds``` for a total of 1 second.  This issue I had with this was that the solver could not process this faster than about ```33 ms```.  I wanted to keep the solver fast so I could maintain a framerate of ```25``` with some extra headroom.  I decided that ```10 steps``` was ideal for this but I had to increase the dt to ```0.1 seconds``` to meet the onw second requirement.  Another reason for having a dt of ```.1 seconds``` was that it lined up perfectly with the ```100 ms``` delay from the measurement system.
+To generate the ideal trajectory, a set of N points covers a duration of T seconds with a timestep dt.  The duration of the desired trajectory, T, is desired to be around ```1 second```.  Using this as a starting point, I initally set the step size to ```20``` and incremented by a time delta of ```0.05 seconds``` for a total of 1 second.  The issue I had with this was that the solver could not process this faster than about ```33 ms```.  I wanted to keep the solver fast so I could maintain a framerate of ```25``` with some extra headroom.  I decided that ```10 steps``` was ideal for this but I had to increase the dt to ```0.1 seconds``` to meet the one second requirement.  Another reason for having a dt of ```.1 seconds``` was that it lined up perfectly with the ```100 ms``` delay from the measurement system.
 
 ### Polynomial Fit
 
 Waypoints from the Unity model are given for the desired track line to follow on the Lake Course.  By fitting a polynomial to the waypoints, it can be sent to the MPC solver to come up with a trajectory that minimizes the error between the car and the track.
 
-The waypoints are provided in world coordinates, so they must be converted to vehicle coordinates before that can be used in MPC.  This is accomplished in main.cpp where the rotation and translation of the vehicle in world space are made availible.  Once the coordinates are transformed, a ```3rd order``` polynomial fit is performed and the cross track error and vehicle heading error are calculated.
+The waypoints are provided in world coordinates, so they must be converted to vehicle coordinates before that can be used in MPC.  This is accomplished in main.cpp where the rotation and translation of the vehicle in world space are made available.  Once the coordinates are transformed, a ```3rd order``` polynomial fit is performed and the cross track error and vehicle heading error are calculated.
 
 Since the waypoints are moved into the vehicle coordinate system, the state for the x, y, and psi positions are all set to 0.  This simplifies the state velocity, cross track error, and psi error only.  These are then fed into the MPC ```Solve``` function.
 
 ### Latency
 
-In the real world sensors will have some degree of latency when get to the model.  This latency is the sum of the communication path, filters, and even from the sensor itself.  It is important to understand the latency you have in the system so you can control with the correct update step.  Here the latency is hard coded as 100 miliseconds. Since the measurement comes from the past, it is important to either propagate this measurement forward in time or move the control back in time by the delay value.  In my case I moved the control for this measurement back in time one step where a step is equal to 100 ms. This was handled right in the MPC class ```FG_eval``` function.
+In the real world, sensors will have some degree of latency when they get into the model update.  This latency is the sum of delays in the communication path, filters, and even from the sensor itself.  It is important to understand the latency you have in the system so that you can control in the correct timeframe.  Here the latency is hard coded as 100 miliseconds. Since the measurement comes from the past, it is important to either propagate this measurement forward in time or move the control back in time by the delay value.  In my case I moved the control for this measurement back in time one step, where a step is equal to 100 ms. This was handled right in the MPC class ```FG_eval``` function.
 
 ## Simulation Results
 
