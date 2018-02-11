@@ -2,6 +2,49 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
+## Introduction
+
+In this project we implement Model Predictive Control to drive the car around the track. This time however we are not given the cross track error, we have to calculate that! Additionally, there's a 100 millisecond latency between actuations commands on top of the connection latency.
+
+## Implementation
+
+### The Model Predictive Control Loop
+
+I implemented the Model Predictive Controller from the Udacity class lectures.  Put simply this controls the vehicle by optimizing a cost function using a polynomial trajectory to generate actuator outputs.
+
+The main MPC loop and the equations used in this implementation are shown as follows:
+
+![alt text](./MPC.png "MPC")
+
+The state includes the {x,y} position and velocity of the car with crosstrack and steering angle errors. The contraints are a steering angle between ```-25 and 25``` degrees with a bounded accelleration between ```+1 and -1```.  The cost minimizes the errors between the desired and current state, the use of the actuator controls, and the amount of change between sequential actions.  The model is based on the kinematic equations for the standard bicycle model with added weight and center of gravity. The control outputs are the steering and acceleration actuations.
+
+### Time Stepping
+
+To generate the ideal trajectory a set of N points covers a duration of T seconds with a timestep dt.  The duration of the desired trajectory, T, is desired to be around ```1 second```.  Using this as a starting point I initally set the step size to ```20``` and incremented by a time deltat of ```0.05 seconds``` for a total of 1 second.  This issue I had with this was that the solver could not process this faster than about ```33 ms```.  I wanted to keep the solver fast so I could maintain a framerate of ```25``` with some extra headroom.  I decided that ```10 steps``` was ideal for this but I had to increase the dt to ```0.1 seconds``` to meet the onw second requirement.  Another reason for having a dt of ```.1 seconds``` was that it lined up perfectly with the ```100 ms``` delay from the measurement system.
+
+### Polynomial Fit
+
+Waypoints from the Unity model are given for the desired track line to follow on the Lake Course.  By fitting a polynomial to the waypoints, it can be sent to the MPC solver to come up with a trajectory that minimizes the error between the car and the track.
+
+The waypoints are provided in world coordinates, so they must be converted to vehicle coordinates before that can be used in MPC.  This is accomplished in main.cpp where the rotation and translation of the vehicle in world space are made availible.  Once the coordinates are transformed, a ```3rd order``` polynomial fit is performed and the cross track error and vehicle heading error are calculated.
+
+Since the waypoints are moved into the vehicle coordinate system, the state for the x, y, and psi positions are all set to 0.  This simplifies the state velocity, cross track error, and psi error only.  These are then fed into the MPC ```Solve``` function.
+
+### Latency
+
+In the real world sensors will have some degree of latency when get to the model.  This latency is the sum of the communication path, filters, and even from the sensor itself.  It is important to understand the latency you have in the system so you can control with the correct update step.  Here the latency is hard coded as 100 miliseconds. Since the measurement comes from the past, it is important to either propagate this measurement forward in time or move the control back in time by the delay value.  In my case I moved the control for this measurement back in time one step where a step is equal to 100 ms. This was handled right in the MPC class ```FG_eval``` function.
+
+## Simulation Results
+
+### The vehicle must successfully drive a lap around the track.
+
+No tire may leave the drivable portion of the track surface. The car may not pop up onto ledges or roll over any surfaces that would otherwise be considered unsafe (if humans were in the vehicle).
+
+Here are the results of running the simulator at a desired setting of ```80 MPH``` completing a full lape of the Lake Course.
+
+![alt text](./MPC_80_MPH.gif "80 MPH")
+
+A longer 2 minute YouTube video is featured here: https://youtu.be/E5XWZySQaB0
 
 ## Dependencies
 
@@ -37,6 +80,7 @@ Self-Driving Car Engineer Nanodegree Program
 2. Make a build directory: `mkdir build && cd build`
 3. Compile: `cmake .. && make`
 4. Run it: `./mpc`.
+5. Run it with some speed: `./mpc <speed>`.
 
 ## Tips
 
@@ -50,16 +94,12 @@ is the vehicle starting offset of a straight line (reference). If the MPC implem
 
 ## Editor Settings
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
 * indent using spaces
 * set tab width to 2 spaces (keeps the matrices in source code aligned)
 
 ## Code Style
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+This code follows the [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
 
 ## Project Instructions and Rubric
 
@@ -70,39 +110,8 @@ More information is only accessible by people who are already enrolled in Term 2
 of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/1a2255a0-e23c-44cf-8d41-39b8a3c8264a)
 for instructions and the project rubric.
 
-## Hints!
+## References
 
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
+1. https://www.coin-or.org/Ipopt/documentation
 
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+2. https://www.coin-or.org/CppAD/Doc/introduction.htm
